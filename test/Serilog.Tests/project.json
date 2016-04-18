@@ -17,7 +17,7 @@
     "dnx452": {
       "compilationOptions": {
         "keyFile": "../../assets/Serilog.snk",
-        "define": [ "APPSETTINGS", "PROCESS", "FILE_IO", "PERIODIC_BATCHING", "INTERNAL_TESTS", "REMOTING", "APPDOMAIN" ]
+        "define": [ "APPSETTINGS", "PROCESS", "FILE_IO", "PERIODIC_BATCHING", "INTERNAL_TESTS", "REMOTING" ]
       },
       "frameworkAssemblies": {
         "System.Configuration": ""

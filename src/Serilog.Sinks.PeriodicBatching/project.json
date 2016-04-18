@@ -15,7 +15,7 @@
   "frameworks": {
     "net45": {
       "compilationOptions": {
-        "define": [ "APPDOMAIN", "WAITABLE_TIMER" ]
+        "define": [ "WAITABLE_TIMER" ]
       }
     },
     "dotnet5.2": {
