@@ -66,25 +66,8 @@ namespace Serilog.Sinks.PeriodicBatching
 #else
             _timer = new PortableTimer(cancel => OnTick());
 #endif
-
-#if APPDOMAIN
-            AppDomain.CurrentDomain.DomainUnload += OnAppDomainUnloading;
-            AppDomain.CurrentDomain.ProcessExit += OnAppDomainUnloading;
-            AppDomain.CurrentDomain.UnhandledException += OnAppDomainUnloading;
-#endif
         }
-
-#if APPDOMAIN
-        void OnAppDomainUnloading(object sender, EventArgs args)
-        {
-            var eventArgs = args as UnhandledExceptionEventArgs;
-            if (eventArgs != null && !eventArgs.IsTerminating)
-                return;
-
-            CloseAndFlush();
-        }
-#endif
-
+        
         void CloseAndFlush()
         {
             lock (_stateLock)
@@ -94,13 +77,7 @@ namespace Serilog.Sinks.PeriodicBatching
 
                 _unloading = true;
             }
-
-#if APPDOMAIN
-            AppDomain.CurrentDomain.DomainUnload -= OnAppDomainUnloading;
-            AppDomain.CurrentDomain.ProcessExit -= OnAppDomainUnloading;
-            AppDomain.CurrentDomain.UnhandledException -= OnAppDomainUnloading;
-#endif
-
+            
 #if WAITABLE_TIMER
             var wh = new ManualResetEvent(false);
             if (_timer.Dispose(wh))
