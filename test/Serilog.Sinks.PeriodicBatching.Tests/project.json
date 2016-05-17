@@ -8,7 +8,7 @@
     "dotnet-test-xunit": "1.0.0-rc2-build10015"
   },
   "buildOptions": {
-    "keyFile": "../../assets/Serilog.snk",
+    "keyFile": "../../assets/Serilog.snk"
   },
   "frameworks": {
     "net4.5.2": {

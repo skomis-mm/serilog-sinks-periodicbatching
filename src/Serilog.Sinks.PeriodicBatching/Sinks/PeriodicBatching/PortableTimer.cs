@@ -102,7 +102,10 @@ namespace Serilog.Sinks.PeriodicBatching
                     }
                 }
 
+// On the very old platforms, we've got no option but to spin here.
+#if THREAD
                 Thread.Sleep(10);
+#endif
             }
         }
     }
