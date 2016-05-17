@@ -1,6 +1,6 @@
-# The periodic batching sink for Serilog 
+# Serilog.Sinks.PeriodicBatching
 
-##NOTE: Work in progress as apart of the [Serilog 2.0 release](https://github.com/serilog/serilog/issues?q=is%3Aissue+is%3Aopen+label%3Av2).
+A base for Serilog sinks that batch and asyncrhronously send events to a slow/remote target.
 
 [![Build status](https://ci.appveyor.com/api/projects/status/w2agqyd8rn0jur9y?svg=true)](https://ci.appveyor.com/project/serilog/serilog-sinks-periodicbatching) [![NuGet Version](http://img.shields.io/nuget/v/Serilog.Sinks.periodicbatching.svg?style=flat)](https://www.nuget.org/packages/Serilog.Sinks.periodicbatching/)
 
