@@ -18,10 +18,18 @@
   "frameworks": {
     "net4.5": {
       "buildOptions": {
-        "define": [ "WAITABLE_TIMER" ]
+        "define": [ "WAITABLE_TIMER", "THREAD" ]
+      }
+    },
+    "netstandard1.1": {
+      "dependencies": {
+        "System.Collections.Concurrent": "4.0.12-rc2-24027"
       }
     },
     "netstandard1.3": {
+      "buildOptions": {
+        "define": [ "THREAD" ]
+      },
       "dependencies": {
         "System.Collections.Concurrent": "4.0.12-rc2-24027",
         "System.Threading.Thread": "4.0.0-rc2-24027"
