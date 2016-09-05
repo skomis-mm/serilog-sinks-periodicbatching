@@ -43,7 +43,7 @@ namespace Serilog.Sinks.PeriodicBatching
             _onTick = onTick;
         }
 
-        public async void Start(TimeSpan interval)
+        public void Start(TimeSpan interval)
         {
             if (interval < TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(interval));
 
@@ -62,28 +62,34 @@ namespace Serilog.Sinks.PeriodicBatching
 
                 _state = PortableTimerState.Waiting;
             }
+            
+            Task.Delay(interval, _cancel.Token)
+                .ContinueWith(
+                    _ =>
+                    {
+                        try
+                        {
+                            _state = PortableTimerState.Active;
 
-            try
-            {
-                if (interval > TimeSpan.Zero)
-                    await Task.Delay(interval, _cancel.Token).ConfigureAwait(false);
-
-                _state = PortableTimerState.Active;
-
-                if (!_cancel.Token.IsCancellationRequested)
-                {
-                    _onTick(_cancel.Token);
-                }
-            }
-            catch (TaskCanceledException tcx)
-            {
-                SelfLog.WriteLine("The timer was canceled during invocation: {0}", tcx);
-            }
-            finally
-            {
-                lock (_stateLock)
-                    _state = PortableTimerState.NotWaiting;
-            }
+                            if (!_cancel.Token.IsCancellationRequested)
+                            {
+                                _onTick(_cancel.Token);
+                            }
+                        }
+                        catch (TaskCanceledException tcx)
+                        {
+                            SelfLog.WriteLine("The timer was canceled during invocation: {0}", tcx);
+                        }
+                        finally
+                        {
+                            lock (_stateLock)
+                                _state = PortableTimerState.NotWaiting;
+                        }
+                    },
+                    CancellationToken.None,
+                    TaskContinuationOptions.DenyChildAttach,
+                    TaskScheduler.Default)
+                .AsObserved();
         }
 
         public void Dispose()
@@ -108,6 +114,14 @@ namespace Serilog.Sinks.PeriodicBatching
 #endif
             }
         }
+    }
+
+    static class TaskExtensions
+    {
+        public static async void AsObserved(this Task task)
+        {
+            await task.ConfigureAwait(false);
+        } 
     }
 }
 #endif
