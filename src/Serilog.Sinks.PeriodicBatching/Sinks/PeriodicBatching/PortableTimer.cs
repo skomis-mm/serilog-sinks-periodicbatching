@@ -69,9 +69,7 @@ namespace Serilog.Sinks.PeriodicBatching
                     {
                         try
                         {
-                            lock (_stateLock)
-                                if (_state != PortableTimerState.Disposed)
-                                    _state = PortableTimerState.Active;
+                            _state = PortableTimerState.Active;
 
                             if (!_cancel.Token.IsCancellationRequested)
                             {
@@ -85,8 +83,7 @@ namespace Serilog.Sinks.PeriodicBatching
                         finally
                         {
                             lock (_stateLock)
-                                if (_state != PortableTimerState.Disposed)
-                                    _state = PortableTimerState.NotWaiting;
+                                _state = PortableTimerState.NotWaiting;
                         }
                     },
                     CancellationToken.None,
