@@ -1,4 +1,4 @@
-﻿#if NETCOREAPP1_0
+﻿#if !WAITABLE_TIMER
 
 using Serilog.Debugging;
 using Serilog.Sinks.PeriodicBatching;
