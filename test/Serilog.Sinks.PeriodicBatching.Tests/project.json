@@ -25,9 +25,6 @@
     },
 
     "net4.5.2": {
-      "buildOptions": {
-        "define": [ "WAITABLE_TIMER" ]
-      }
     }
   }
 }
