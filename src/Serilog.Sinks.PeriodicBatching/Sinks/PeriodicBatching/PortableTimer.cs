@@ -83,7 +83,10 @@ namespace Serilog.Sinks.PeriodicBatching
                         finally
                         {
                             lock (_stateLock)
+                            {
                                 _state = PortableTimerState.NotWaiting;
+                                Monitor.Pulse(_stateLock);
+                            }
                         }
                     },
                     CancellationToken.None,
@@ -95,23 +98,18 @@ namespace Serilog.Sinks.PeriodicBatching
         public void Dispose()
         {
             _cancel.Cancel();
-
-            while (true)
+            
+            lock (_stateLock)
             {
-                lock (_stateLock)
+                if (_state != PortableTimerState.Disposed &&
+                    _state != PortableTimerState.NotWaiting)
                 {
-                    if (_state == PortableTimerState.Disposed ||
-                        _state == PortableTimerState.NotWaiting)
-                    {
-                        _state = PortableTimerState.Disposed;
-                        return;
-                    }
+                    Monitor.Wait(_stateLock);
                 }
 
-// On the very old platforms, we've got no option but to spin here.
-#if THREAD
-                Thread.Sleep(10);
-#endif
+                _state = PortableTimerState.Disposed;
+                
+                Monitor.Pulse(_stateLock);
             }
         }
     }
