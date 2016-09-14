@@ -23,24 +23,27 @@ namespace Serilog.Sinks.PeriodicBatching
 {
     class PortableTimer : IDisposable
     {
-        enum PortableTimerState
-        {
-            NotWaiting,
-            Waiting,
-            Active,
-            Disposed
-        }
-
         readonly object _stateLock = new object();
-        PortableTimerState _state = PortableTimerState.NotWaiting;
 
         readonly Action<CancellationToken> _onTick;
         readonly CancellationTokenSource _cancel = new CancellationTokenSource();
 
+#if THREADING_TIMER
+        readonly Timer _timer;
+#endif
+
+        bool _running;
+        bool _disposed;
+
         public PortableTimer(Action<CancellationToken> onTick)
         {
             if (onTick == null) throw new ArgumentNullException(nameof(onTick));
+
             _onTick = onTick;
+
+#if THREADING_TIMER
+            _timer = new Timer(_ => OnTick(), null, Timeout.Infinite, Timeout.Infinite);
+#endif
         }
 
         public void Start(TimeSpan interval)
@@ -49,34 +52,49 @@ namespace Serilog.Sinks.PeriodicBatching
 
             lock (_stateLock)
             {
-                if (_state == PortableTimerState.Disposed)
-                    throw new ObjectDisposedException("PortableTimer");
+                if (_disposed)
+                    throw new ObjectDisposedException(nameof(PortableTimer));
 
-                // There's a little bit of raciness here, but it's needed to support the
-                // current API, which allows the tick handler to reenter and set the next interval.
-
-                if (_state == PortableTimerState.Waiting)
-                    throw new InvalidOperationException("The timer is already set.");
-
-                if (_cancel.IsCancellationRequested) return;
-
-                _state = PortableTimerState.Waiting;
+#if THREADING_TIMER
+                _timer.Change(interval, Timeout.InfiniteTimeSpan);
+#else
+                Task.Delay(interval, _cancel.Token)
+                    .ContinueWith(
+                        _ => OnTick(),
+                        CancellationToken.None,
+                        TaskContinuationOptions.DenyChildAttach,
+                        TaskScheduler.Default)
+                    .AsObserved();
+#endif
             }
-
-            Task.Delay(interval, _cancel.Token)
-                .ContinueWith(
-                    _ => OnTick(),
-                    CancellationToken.None,
-                    TaskContinuationOptions.DenyChildAttach,
-                    TaskScheduler.Default)
-                .AsObserved();
         }
 
         private void OnTick()
         {
             try
             {
-                _state = PortableTimerState.Active;
+                lock (_stateLock)
+                {
+                    if (_disposed)
+                    {
+                        return;
+                    }
+
+                    // There's a little bit of raciness here, but it's needed to support the
+                    // current API, which allows the tick handler to reenter and set the next interval.
+
+                    if (_running)
+                    {
+                        Monitor.Wait(_stateLock);
+
+                        if (_disposed)
+                        {
+                            return;
+                        }
+                    }                    
+
+                    _running = true;
+                }
 
                 if (!_cancel.Token.IsCancellationRequested)
                 {
@@ -91,8 +109,8 @@ namespace Serilog.Sinks.PeriodicBatching
             {
                 lock (_stateLock)
                 {
-                    _state = PortableTimerState.NotWaiting;
-                    Monitor.Pulse(_stateLock);
+                    _running = false;
+                    Monitor.PulseAll(_stateLock);
                 }
             }
         }
@@ -103,15 +121,21 @@ namespace Serilog.Sinks.PeriodicBatching
             
             lock (_stateLock)
             {
-                if (_state != PortableTimerState.Disposed &&
-                    _state != PortableTimerState.NotWaiting)
+                if (_disposed)
+                {
+                    return;
+                }
+
+                while (_running)
                 {
                     Monitor.Wait(_stateLock);
                 }
 
-                _state = PortableTimerState.Disposed;
-                
-                Monitor.Pulse(_stateLock);
+#if THREADING_TIMER
+                _timer.Dispose();
+#endif
+
+                _disposed = true;
             }
         }
     }
