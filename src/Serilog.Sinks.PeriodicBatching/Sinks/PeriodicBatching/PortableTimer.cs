@@ -62,37 +62,39 @@ namespace Serilog.Sinks.PeriodicBatching
 
                 _state = PortableTimerState.Waiting;
             }
-            
+
             Task.Delay(interval, _cancel.Token)
                 .ContinueWith(
-                    _ =>
-                    {
-                        try
-                        {
-                            _state = PortableTimerState.Active;
-
-                            if (!_cancel.Token.IsCancellationRequested)
-                            {
-                                _onTick(_cancel.Token);
-                            }
-                        }
-                        catch (TaskCanceledException tcx)
-                        {
-                            SelfLog.WriteLine("The timer was canceled during invocation: {0}", tcx);
-                        }
-                        finally
-                        {
-                            lock (_stateLock)
-                            {
-                                _state = PortableTimerState.NotWaiting;
-                                Monitor.Pulse(_stateLock);
-                            }
-                        }
-                    },
+                    _ => OnTick(),
                     CancellationToken.None,
                     TaskContinuationOptions.DenyChildAttach,
                     TaskScheduler.Default)
                 .AsObserved();
+        }
+
+        private void OnTick()
+        {
+            try
+            {
+                _state = PortableTimerState.Active;
+
+                if (!_cancel.Token.IsCancellationRequested)
+                {
+                    _onTick(_cancel.Token);
+                }
+            }
+            catch (OperationCanceledException tcx)
+            {
+                SelfLog.WriteLine("The timer was canceled during invocation: {0}", tcx);
+            }
+            finally
+            {
+                lock (_stateLock)
+                {
+                    _state = PortableTimerState.NotWaiting;
+                    Monitor.Pulse(_stateLock);
+                }
+            }
         }
 
         public void Dispose()
