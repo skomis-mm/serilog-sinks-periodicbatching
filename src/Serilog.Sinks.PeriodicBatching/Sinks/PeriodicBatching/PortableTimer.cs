@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#if !WAITABLE_TIMER
-
 using Serilog.Debugging;
 using System;
 using System.Threading;
@@ -148,4 +146,3 @@ namespace Serilog.Sinks.PeriodicBatching
         } 
     }
 }
-#endif
