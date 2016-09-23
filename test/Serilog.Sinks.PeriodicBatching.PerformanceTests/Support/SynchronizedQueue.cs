@@ -4,7 +4,14 @@ namespace Serilog.Sinks.PeriodicBatching.PerformanceTests.Support
 {
     class SynchronizedQueue<T> : Queue<T>
     {
+        const int NON_BOUNDED = -1;
+
         readonly int _queueLimit;
+
+        public SynchronizedQueue()
+        {
+            _queueLimit = NON_BOUNDED;
+        }
 
         public SynchronizedQueue(int queueLimit)
         {
@@ -31,7 +38,7 @@ namespace Serilog.Sinks.PeriodicBatching.PerformanceTests.Support
         {
             lock (this)
             {
-                if (base.Count < _queueLimit)
+                if (base.Count < _queueLimit || _queueLimit == NON_BOUNDED)
                 {
                     base.Enqueue(item);
                     return true;

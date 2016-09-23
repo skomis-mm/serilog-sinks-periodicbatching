@@ -10,57 +10,66 @@ namespace Serilog.Sinks.PeriodicBatching.PerformanceTests
 {
     public class BoundedQueue_Enqueue_Dequeue_Benchmark
     {
-        [Params(100, 1000)]
-        public int ItemsCount { get; set; }
+        const int NON_BOUNDED = -1;
 
-        [Params(100, 1000)]
-        public int QueueLimit { get; set; }
+        [Params(50, 100)]
+        public int Items { get; set; }
+
+        [Params(NON_BOUNDED, 50, 100)]
+        public int Limit { get; set; }
 
         readonly LogEvent _logEvent = Some.LogEvent();
 
-        ConcurrentQueue<LogEvent> _concurrentQueue;
-        BlockingCollection<LogEvent> _blockingCollection;
-        BoundedConcurrentQueue<LogEvent> _boundedConcurrentQueue;
-        SynchronizedQueue<LogEvent> _syncronizedQueue;
+        Func<ConcurrentQueue<LogEvent>> _concurrentQueueFactory;
+        Func<BoundedConcurrentQueue<LogEvent>> _boundedConcurrentQueueFactory;
+        Func<BlockingCollection<LogEvent>> _blockingCollectionFactory;
+        Func<SynchronizedQueue<LogEvent>> _synchronizedQueueFactory;
 
         [Setup]
         public void Setup()
         {
-            _concurrentQueue = new ConcurrentQueue<LogEvent>();
-            _blockingCollection = new BlockingCollection<LogEvent>(QueueLimit);
-            _boundedConcurrentQueue = new BoundedConcurrentQueue<LogEvent>(QueueLimit);
-            _syncronizedQueue = new SynchronizedQueue<LogEvent>(QueueLimit);
+            _concurrentQueueFactory = () => new ConcurrentQueue<LogEvent>();
+            _boundedConcurrentQueueFactory = Limit != NON_BOUNDED ? new Func<BoundedConcurrentQueue<LogEvent>>(() => new BoundedConcurrentQueue<LogEvent>(Limit))
+                                                                  : new Func<BoundedConcurrentQueue<LogEvent>>(() => new BoundedConcurrentQueue<LogEvent>());
+            _blockingCollectionFactory = Limit != NON_BOUNDED ? new Func<BlockingCollection<LogEvent>>(() => new BlockingCollection<LogEvent>(Limit))
+                                                              : new Func<BlockingCollection<LogEvent>>(() => new BlockingCollection<LogEvent>());
+            _synchronizedQueueFactory = Limit != NON_BOUNDED ? new Func<SynchronizedQueue<LogEvent>>(() => new SynchronizedQueue<LogEvent>(Limit))
+                                                              : new Func<SynchronizedQueue<LogEvent>>(() => new SynchronizedQueue<LogEvent>());
         }
 
         [Benchmark(Baseline = true)]
         public void ConcurrentQueue()
         {
-            EnqueueDequeueItems(evt => _concurrentQueue.Enqueue(evt), evt => _concurrentQueue.TryDequeue(out evt));
+            var queue = _concurrentQueueFactory();
+            EnqueueDequeueItems(evt => queue.Enqueue(evt), evt => queue.TryDequeue(out evt));
         }
 
         [Benchmark]
         public void BoundedConcurrentQueue()
         {
-            EnqueueDequeueItems(evt => _boundedConcurrentQueue.TryEnqueue(evt), evt => _boundedConcurrentQueue.TryDequeue(out evt));
+            var queue = _boundedConcurrentQueueFactory();
+            EnqueueDequeueItems(evt => queue.TryEnqueue(evt), evt => queue.TryDequeue(out evt));
         }
 
         [Benchmark]
         public void BlockingCollection()
         {
-            EnqueueDequeueItems(evt => _blockingCollection.TryAdd(evt), evt => _blockingCollection.TryTake(out evt));
+            var queue = _blockingCollectionFactory();
+            EnqueueDequeueItems(evt => queue.TryAdd(evt), evt => queue.TryTake(out evt));
         }
 
         [Benchmark]
         public void SynchronizedQueue()
         {
-            EnqueueDequeueItems(evt => _syncronizedQueue.TryEnqueue(evt), evt => _syncronizedQueue.TryDequeue(out evt));
+            var queue = _synchronizedQueueFactory();
+            EnqueueDequeueItems(evt => queue.TryEnqueue(evt), evt => queue.TryDequeue(out evt));
         }
 
         void EnqueueDequeueItems(Action<LogEvent> enqueueAction, Action<LogEvent> dequeueAction)
         {
             Parallel.Invoke(
-                () => Parallel.For(0, ItemsCount, _ => enqueueAction(_logEvent)),
-                () => { for (var i = 0; i < ItemsCount; i++) dequeueAction(_logEvent); });
+                () => Parallel.For(0, Items, _ => enqueueAction(_logEvent)),
+                () => { for (var i = 0; i < Items; i++) dequeueAction(_logEvent); });
         }
     }
 }

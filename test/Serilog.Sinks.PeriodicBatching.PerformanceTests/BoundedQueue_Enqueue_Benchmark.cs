@@ -10,58 +10,67 @@ namespace Serilog.Sinks.PeriodicBatching.PerformanceTests
 {
     public class BoundedQueue_Enqueue_Benchmark
     {
-        [Params(100, 1000)]
-        public int ItemsCount { get; set; }
+        const int NON_BOUNDED = -1;
 
-        [Params(100, 1000)]
-        public int QueueLimit { get; set; }
+        [Params(50, 100)]
+        public int Items { get; set; }
+
+        [Params(NON_BOUNDED, 50, 100)]
+        public int Limit { get; set; }
 
         [Params(1, -1)]
-        public int MaxDegreeOfParallelism { get; set; }
+        public int ConcurrencyLevel { get; set; }
 
         readonly LogEvent _logEvent = Some.LogEvent();
 
-        ConcurrentQueue<LogEvent> _concurrentQueue;
-        BlockingCollection<LogEvent> _blockingCollection;
-        BoundedConcurrentQueue<LogEvent> _boundedConcurrentQueue;
-        SynchronizedQueue<LogEvent> _syncronizedQueue;
+        Func<ConcurrentQueue<LogEvent>> _concurrentQueueFactory;
+        Func<BoundedConcurrentQueue<LogEvent>> _boundedConcurrentQueueFactory;
+        Func<BlockingCollection<LogEvent>> _blockingCollectionFactory;
+        Func<SynchronizedQueue<LogEvent>> _synchronizedQueueFactory;
 
         [Setup]
         public void Setup()
         {
-            _concurrentQueue = new ConcurrentQueue<LogEvent>();
-            _blockingCollection = new BlockingCollection<LogEvent>(QueueLimit);
-            _boundedConcurrentQueue = new BoundedConcurrentQueue<LogEvent>(QueueLimit);
-            _syncronizedQueue = new SynchronizedQueue<LogEvent>(QueueLimit);
+            _concurrentQueueFactory = () => new ConcurrentQueue<LogEvent>();
+            _boundedConcurrentQueueFactory = Limit != NON_BOUNDED ? new Func<BoundedConcurrentQueue<LogEvent>>(() => new BoundedConcurrentQueue<LogEvent>(Limit))
+                                                                  : new Func<BoundedConcurrentQueue<LogEvent>>(() => new BoundedConcurrentQueue<LogEvent>());
+            _blockingCollectionFactory = Limit != NON_BOUNDED ? new Func<BlockingCollection<LogEvent>>(() => new BlockingCollection<LogEvent>(Limit))
+                                                              : new Func<BlockingCollection<LogEvent>>(() => new BlockingCollection<LogEvent>());
+            _synchronizedQueueFactory = Limit != NON_BOUNDED ? new Func<SynchronizedQueue<LogEvent>>(() => new SynchronizedQueue<LogEvent>(Limit))
+                                                              : new Func<SynchronizedQueue<LogEvent>>(() => new SynchronizedQueue<LogEvent>());
         }
 
         [Benchmark(Baseline = true)]
         public void ConcurrentQueue()
         {
-            EnqueueItems(evt => _concurrentQueue.Enqueue(evt));
+            var queue = _concurrentQueueFactory();
+            EnqueueItems(evt => queue.Enqueue(evt));
         }
 
         [Benchmark]
         public void BoundedConcurrentQueue()
         {
-            EnqueueItems(evt => _boundedConcurrentQueue.TryEnqueue(evt));
+            var queue = _boundedConcurrentQueueFactory();
+            EnqueueItems(evt => queue.TryEnqueue(evt));
         }
 
         [Benchmark]
         public void BlockingCollection()
         {
-            EnqueueItems(evt => _blockingCollection.TryAdd(evt));
+            var queue = _blockingCollectionFactory();
+            EnqueueItems(evt => queue.TryAdd(evt));
         }
 
         [Benchmark]
         public void SynchronizedQueue()
         {
-            EnqueueItems(evt => _syncronizedQueue.TryEnqueue(evt));
+            var queue = _synchronizedQueueFactory();
+            EnqueueItems(evt => queue.TryEnqueue(evt));
         }
 
         void EnqueueItems(Action<LogEvent> enqueueAction)
         {
-            Parallel.For(0, ItemsCount, new ParallelOptions() { MaxDegreeOfParallelism = MaxDegreeOfParallelism }, _ => enqueueAction(_logEvent));
+            Parallel.For(0, Items, new ParallelOptions() { MaxDegreeOfParallelism = ConcurrencyLevel }, _ => enqueueAction(_logEvent));
         }
     }
 }
