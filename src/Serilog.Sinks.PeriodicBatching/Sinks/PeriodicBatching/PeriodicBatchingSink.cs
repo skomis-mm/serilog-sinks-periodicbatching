@@ -37,7 +37,7 @@ namespace Serilog.Sinks.PeriodicBatching
     public abstract class PeriodicBatchingSink : ILogEventSink, IDisposable
     {
         readonly int _batchSizeLimit;
-        readonly ConcurrentQueue<LogEvent> _queue;
+        readonly BoundedConcurrentQueue<LogEvent> _queue;
         readonly BatchedConnectionStatus _status;
         readonly Queue<LogEvent> _waitingBatch = new Queue<LogEvent>();
 
@@ -58,7 +58,7 @@ namespace Serilog.Sinks.PeriodicBatching
         protected PeriodicBatchingSink(int batchSizeLimit, TimeSpan period)
         {
             _batchSizeLimit = batchSizeLimit;
-            _queue = new ConcurrentQueue<LogEvent>();
+            _queue = new BoundedConcurrentQueue<LogEvent>();
             _status = new BatchedConnectionStatus(period);
 
 #if WAITABLE_TIMER
@@ -67,7 +67,19 @@ namespace Serilog.Sinks.PeriodicBatching
             _timer = new PortableTimer(cancel => OnTick());
 #endif
         }
-        
+
+        /// <summary>
+        /// Construct a sink posting to the specified database.
+        /// </summary>
+        /// <param name="batchSizeLimit">The maximum number of events to include in a single batch.</param>
+        /// <param name="period">The time to wait between checking for event batches.</param>
+        /// <param name="queueLimit">Maximum number of events in the queue.</param>
+        protected PeriodicBatchingSink(int batchSizeLimit, TimeSpan period, int queueLimit)
+            : this(batchSizeLimit, period)
+        {
+            _queue = new BoundedConcurrentQueue<LogEvent>(queueLimit);
+        }
+
         void CloseAndFlush()
         {
             lock (_stateLock)
@@ -233,7 +245,7 @@ namespace Serilog.Sinks.PeriodicBatching
                     {
                         // Special handling to try to get the first event across as quickly
                         // as possible to show we're alive!
-                        _queue.Enqueue(logEvent);
+                        _queue.TryEnqueue(logEvent);
                         _started = true;
                         SetTimer(TimeSpan.Zero);
                         return;
@@ -241,7 +253,7 @@ namespace Serilog.Sinks.PeriodicBatching
                 }
             }
 
-            _queue.Enqueue(logEvent);
+            _queue.TryEnqueue(logEvent);
         }
 
         /// <summary>
