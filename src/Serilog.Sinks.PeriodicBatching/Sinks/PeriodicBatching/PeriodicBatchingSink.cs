@@ -19,7 +19,6 @@ using System.Threading.Tasks;
 using Serilog.Core;
 using Serilog.Debugging;
 using Serilog.Events;
-using System.Threading;
 
 namespace Serilog.Sinks.PeriodicBatching
 {
@@ -85,16 +84,7 @@ namespace Serilog.Sinks.PeriodicBatching
 
             _timer.Dispose();
 
-            var prevContext = SynchronizationContext.Current;
-            SynchronizationContext.SetSynchronizationContext(null);
-            try
-            {
-                OnTick().Wait();
-            }
-            finally
-            {
-                SynchronizationContext.SetSynchronizationContext(prevContext);
-            }
+            Task.Run(() => OnTick()).Wait();
         }
 
         /// <summary>
@@ -157,11 +147,11 @@ namespace Serilog.Sinks.PeriodicBatching
 
                     if (_waitingBatch.Count == 0)
                     {
-                        await OnEmptyBatchAsync().ConfigureAwait(false);
+                        await OnEmptyBatchAsync();
                         return;
                     }
 
-                    await EmitBatchAsync(_waitingBatch).ConfigureAwait(false);
+                    await EmitBatchAsync(_waitingBatch);
 
                     batchWasFull = _waitingBatch.Count >= _batchSizeLimit;
                     _waitingBatch.Clear();

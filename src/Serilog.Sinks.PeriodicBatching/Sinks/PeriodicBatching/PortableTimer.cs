@@ -95,7 +95,7 @@ namespace Serilog.Sinks.PeriodicBatching
 
                 if (!_cancel.Token.IsCancellationRequested)
                 {
-                    await _onTick(_cancel.Token).ConfigureAwait(false);
+                    await _onTick(_cancel.Token);
                 }
             }
             catch (OperationCanceledException tcx)
