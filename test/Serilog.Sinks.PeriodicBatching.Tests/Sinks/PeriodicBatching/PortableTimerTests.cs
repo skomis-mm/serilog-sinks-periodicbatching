@@ -52,14 +52,20 @@ namespace Serilog.Tests.Sinks.PeriodicBatching
 
             SelfLog.Enable(_ => writtenToSelflog = true);
 
+            var barrier = new Barrier(participantCount: 2);
+
             using (var timer = new PortableTimer(
-                                    async token => {
+                                    async token =>
+                                    {
+                                        barrier.SignalAndWait();
+                                        await Task.Delay(50);
+
                                         wasCalled = true;
-                                        await Task.Delay(TimeSpan.FromMilliseconds(50), token);
+                                        await Task.Delay(50, token);
                                     }))
             {
                 timer.Start(TimeSpan.FromMilliseconds(20));
-                Thread.Sleep(40);
+                barrier.SignalAndWait();
             }
 
             Assert.True(wasCalled, "tick handler wasn't called");
