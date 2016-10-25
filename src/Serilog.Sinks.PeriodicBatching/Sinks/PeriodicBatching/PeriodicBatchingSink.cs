@@ -86,8 +86,22 @@ namespace Serilog.Sinks.PeriodicBatching
             _timer.Dispose();
 
             // This is the place where SynchronizationContext.Current is unknown and can be != null
-            // so we prevent deadlocks here for sync-over-async downstream implementations 
+            // so we prevent possible deadlocks here for sync-over-async downstream implementations 
             ResetSyncContextAndWait(OnTick);
+        }
+
+        void ResetSyncContextAndWait(Func<Task> taskFactory)
+        {
+            var prevContext = SynchronizationContext.Current;
+            SynchronizationContext.SetSynchronizationContext(null);
+            try
+            {
+                taskFactory().Wait();
+            }
+            finally
+            {
+                SynchronizationContext.SetSynchronizationContext(prevContext);
+            }
         }
 
         /// <summary>
@@ -261,20 +275,6 @@ namespace Serilog.Sinks.PeriodicBatching
 #pragma warning restore 1998
         {
             OnEmptyBatch();
-        }
-
-        static bool ResetSyncContextAndWait(Func<Task> taskFactory, int timeout = Timeout.Infinite)
-        {
-            var prevContext = SynchronizationContext.Current;
-            SynchronizationContext.SetSynchronizationContext(null);
-            try
-            {
-                return taskFactory().Wait(timeout);
-            }
-            finally
-            {
-                SynchronizationContext.SetSynchronizationContext(prevContext);
-            }
         }
     }
 }
